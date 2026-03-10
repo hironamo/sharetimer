@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>My Focus History</title>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; }
+        #calendar { max-width: 900px; margin: 0 auto; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; }
+        .fc-daygrid-day-number { color: #38bdf8; }
+        .pomo-event { background: #38bdf8 !important; border: none !important; color: #000 !important; font-weight: bold; text-align: center; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #38bdf8; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-link">← タイマーに戻る</a>
+    <h2 id="user-title">Loading History...</h2>
+    <div id="calendar"></div>
+
+    <script>
+        const GAS_URL = "あなたのGASのURL"; // タイマーと同じURL
+        const myName = localStorage.getItem('pomo_name') || "Guest";
+        document.getElementById('user-title').textContent = `${myName} の作業履歴`;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const calendarEl = document.getElementById('calendar');
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'ja',
+                events: function(info, successCallback, failureCallback) {
+                    // GASからデータを取得
+                    const script = document.createElement('script');
+                    window.handleHistory = function(data) {
+                        const events = Object.keys(data).map(date => ({
+                            title: `${data[date]} ポモ (${data[date] * 25}分)`,
+                            start: date,
+                            className: 'pomo-event'
+                        }));
+                        successCallback(events);
+                    };
+                    script.src = `${GAS_URL}?action=getUserHistory&name=${encodeURIComponent(myName)}&callback=handleHistory&t=${Date.now()}`;
+                    document.body.appendChild(script);
+                }
+            });
+            calendar.render();
+        });
+    </script>
+</body>
+</html>
