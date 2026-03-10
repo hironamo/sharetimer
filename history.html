@@ -17,33 +17,45 @@
     <h2 id="user-title">Loading History...</h2>
     <div id="calendar"></div>
 
-    <script>
-        const GAS_URL = "https://script.google.com/a/macros/dc.tohoku.ac.jp/s/AKfycbwhnWt35JjVhtsSSU4rSeLO0Ibpm-_V0V9h3DP9im6eShuHZWCJky2ywOqOiG9LiWuxag/exec"; // タイマーと同じURL
-        const myName = localStorage.getItem('pomo_name') || "Guest";
-        document.getElementById('user-title').textContent = `${myName} の作業履歴`;
+   <script>
+    const GAS_URL = "https://script.google.com/a/macros/dc.tohoku.ac.jp/s/AKfycbyL8sFFMtbrdX8mH_mXxo4g638q8N4ZTi2yVcEv1eYMp7yKz5pw-rsV3rkFUXroza2zyg/exec"; // ★必ず自分のものに書き換え
+    const myName = localStorage.getItem('pomo_name') || "Guest";
+    document.getElementById('user-title').textContent = `${myName} の作業履歴`;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const calendarEl = document.getElementById('calendar');
-            const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                locale: 'ja',
-                events: function(info, successCallback, failureCallback) {
-                    // GASからデータを取得
-                    const script = document.createElement('script');
-                    window.handleHistory = function(data) {
-                        const events = Object.keys(data).map(date => ({
-                            title: `${data[date]} ポモ (${data[date] * 25}分)`,
-                            start: date,
-                            className: 'pomo-event'
-                        }));
-                        successCallback(events);
-                    };
-                    script.src = `${GAS_URL}?action=getUserHistory&name=${encodeURIComponent(myName)}&callback=handleHistory&t=${Date.now()}`;
-                    document.body.appendChild(script);
-                }
-            });
-            calendar.render();
+    function loadCalendar() {
+        // GASへ履歴をリクエスト
+        const script = document.createElement('script');
+        // ランダムなtを付けてキャッシュを回避し、action=getUserHistoryを送る
+        script.src = `${GAS_URL}?action=getUserHistory&name=${encodeURIComponent(myName)}&callback=drawCalendar&t=${Date.now()}`;
+        document.body.appendChild(script);
+    }
+
+    // GASからのレスポンスを受け取ってから実行される関数
+    window.drawCalendar = function(historyData) {
+        const calendarEl = document.getElementById('calendar');
+        const events = Object.keys(historyData).map(date => ({
+            title: `${historyData[date]} ポモ`,
+            start: date,
+            allDay: true
+        }));
+
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'ja',
+            events: events,
+            eventDidMount: function(info) {
+                // 背景色などの微調整
+                info.el.style.backgroundColor = '#38bdf8';
+                info.el.style.color = '#000';
+                info.el.style.border = 'none';
+                info.el.style.borderRadius = '4px';
+            }
         });
-    </script>
+        calendar.render();
+    };
+
+    // ページ読み込み時に開始
+    window.onload = loadCalendar;
+</script>
 </body>
 </html>
