@@ -83,18 +83,6 @@
 
         <div id="status-label" style="letter-spacing: 0.3rem; opacity: 0.7; margin-top: 20px; margin-bottom: 5px; text-transform: uppercase;">READY</div>
 
-### 💡 どこを直したか
-1.  **閉じタグの位置**: `user-config` の開始から終了までに、入力欄とボタンの両方が収まるように配置し直しました。
-2.  **`display: flex`**: ボタンが入力欄の真下に落ちないよう、横並びにする設定を追加しました。
-3.  **`gap: 8px`**: 入力欄とボタンがくっつきすぎないよう、隙間を空けました。
-4.  **`white-space: nowrap`**: 画面が狭くなった時に、ボタンの中の文字「📊 履歴」が勝手に改行されないようにしました。
-
-
-
-### 🚩 history.html の準備はOK？
-`history.html` というファイルが同じフォルダ内に作成されていないと、このボタンを押した時に「404 Not Found（ページが見つかりません）」になってしまいます。
-
-次は、カレンダーを表示するための `history.html` の中身（より詳細なデザイン調整版）を作成しましょうか？それとも配置はこれで直りましたか？
         <div class="session-dots">
             <div class="dot-wrapper" onclick="setSet(1)"><div class="dot"></div></div>
             <div class="dot-wrapper" onclick="setSet(2)"><div class="dot"></div></div>
@@ -251,6 +239,7 @@
 </body>
 
 </html>
+
 
 
 
