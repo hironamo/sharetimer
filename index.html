@@ -59,6 +59,7 @@
 </head>
 <body>
 
+    <audio id="alarm-sound" src="omedetou.mp3" preload="auto"></audio>
     <div id="side-panel">
         <div class="panel-section">
             <h3>🏆 FRIENDS RANKING</h3>
@@ -141,6 +142,11 @@
         };
 
         startBtn.onclick = () => {
+    // 【追加】クリック時に音声をアンロック（鳴る準備をする）
+    document.getElementById('alarm-sound').play().then(() => {
+        const a = document.getElementById('alarm-sound');
+        a.pause(); a.currentTime = 0;
+    }).catch(e => {});
             if (timerId) {
                 clearInterval(timerId); timerId = null;
                 startBtn.textContent = "START";
@@ -225,14 +231,19 @@
         function setLongBreak(m) { document.getElementById('long-break-modal').style.display='none'; sessions = 4; initBreak(m); }
 
         function playAlarm() { 
-            try { 
-                const ctx=new (window.AudioContext || window.webkitAudioContext)(), osc=ctx.createOscillator(), g=ctx.createGain();
-                osc.connect(g); g.connect(ctx.destination);
-                osc.frequency.value=880; g.gain.linearRampToValueAtTime(0.5, ctx.currentTime+0.1);
-                g.gain.linearRampToValueAtTime(0, ctx.currentTime+1);
-                osc.start(); osc.stop(ctx.currentTime+1);
-            } catch(e){} 
-        }
+    const alarmSound = document.getElementById('alarm-sound');
+    if (alarmSound) {
+        alarmSound.currentTime = 0;
+        alarmSound.play().catch(e => {
+            // エラー時のバックアップ（元の電子音）
+            const ctx=new (window.AudioContext || window.webkitAudioContext)(), osc=ctx.createOscillator(), g=ctx.createGain();
+            osc.connect(g); g.connect(ctx.destination);
+            osc.frequency.value=880; g.gain.linearRampToValueAtTime(0.5, ctx.currentTime+0.1);
+            g.gain.linearRampToValueAtTime(0, ctx.currentTime+1);
+            osc.start(); osc.stop(ctx.currentTime+1);
+        });
+    }
+}
 
         fetchRanking(); updateUI();
     </script>
