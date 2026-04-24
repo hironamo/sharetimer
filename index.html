@@ -113,6 +113,7 @@
         const GAS_URL = "https://script.google.com/a/macros/dc.tohoku.ac.jp/s/AKfycbwF0_1CpTnfL8StHq8nE_6Oq8r_YgV6v8mouVayLm87i_Abz5Z5OfJTIL9jetfgJ9HV/exec";
 
         let duration = 25 * 60, timeLeft = 25 * 60, endTime = null, timerId = null, sessions = 1, mode = 'work', currentFilter = 'today';
+        let pendingNotificationAction = null;
         const timerDisplay = document.getElementById('timer'), startBtn = document.getElementById('start-btn'), seekBar = document.getElementById('seek-bar');
         const dots = document.querySelectorAll('.dot'), userNameInput = document.getElementById('user-name'), syncStatus = document.getElementById('sync-status'), statusLabel = document.getElementById('status-label');
 
@@ -147,18 +148,12 @@
         const a = document.getElementById('alarm-sound');
         a.pause(); a.currentTime = 0;
     }).catch(e => {});
+            requestNotificationPermission();
             if (timerId) {
                 clearInterval(timerId); timerId = null;
                 startBtn.textContent = "START";
             } else {
-                endTime = Date.now() + (timeLeft * 1000);
-                statusLabel.textContent = mode.toUpperCase();
-                timerId = setInterval(() => {
-                    timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-                    updateUI();
-                    if(timeLeft <= 0) { clearInterval(timerId); timerId = null; handleEnd(); startBtn.textContent = "START"; }
-                }, 200);
-                startBtn.textContent = "PAUSE";
+                startTimer();
             }
         };
 
@@ -239,9 +234,17 @@
             playAlarm();
             if (mode === 'work') {
                 manualSync();
-                if (sessions >= 4) document.getElementById('long-break-modal').style.display = 'flex';
-                else initBreak(5);
-            } else initWork();
+                if (sessions >= 4) {
+                    document.getElementById('long-break-modal').style.display = 'flex';
+                    showTimerNotification('作業終了', '長めの休憩を選んでください。', null);
+                } else {
+                    initBreak(5);
+                    showTimerNotification('作業終了', '通知をタップして休憩タイマーを開始', startTimer);
+                }
+            } else {
+                initWork();
+                showTimerNotification('休憩終了', '通知をタップして次の作業タイマーを開始', startTimer);
+            }
         }
 
         function initWork() { 
@@ -258,6 +261,39 @@
         }
 
         function setLongBreak(m) { document.getElementById('long-break-modal').style.display='none'; sessions = 4; initBreak(m); }
+
+        function startTimer() {
+            if (timerId || timeLeft <= 0) return;
+            endTime = Date.now() + (timeLeft * 1000);
+            statusLabel.textContent = mode.toUpperCase();
+            timerId = setInterval(() => {
+                timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+                updateUI();
+                if(timeLeft <= 0) { clearInterval(timerId); timerId = null; handleEnd(); startBtn.textContent = "START"; }
+            }, 200);
+            startBtn.textContent = "PAUSE";
+        }
+
+        function requestNotificationPermission() {
+            if (!("Notification" in window)) return;
+            if (Notification.permission === "default") Notification.requestPermission().catch(() => {});
+        }
+
+        function showTimerNotification(title, body, onClickAction) {
+            if (!("Notification" in window) || Notification.permission !== "granted") return;
+            pendingNotificationAction = onClickAction || null;
+            try {
+                const n = new Notification(title, { body, tag: "focus-connect-next", renotify: true });
+                n.onclick = () => {
+                    window.focus();
+                    n.close();
+                    if (typeof pendingNotificationAction === 'function') {
+                        pendingNotificationAction();
+                        pendingNotificationAction = null;
+                    }
+                };
+            } catch (e) {}
+        }
 
         function playAlarm() { 
     const alarmSound = document.getElementById('alarm-sound');
