@@ -141,24 +141,48 @@
             updateUI();
         };
 
+        function requestNotificationPermission() {
+            if (!("Notification" in window) || Notification.permission !== "default") return;
+            Notification.requestPermission().catch(() => {});
+        }
+
+        function startCountdown() {
+            endTime = Date.now() + (timeLeft * 1000);
+            statusLabel.textContent = mode.toUpperCase();
+            timerId = setInterval(() => {
+                timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+                updateUI();
+                if(timeLeft <= 0) { clearInterval(timerId); timerId = null; handleEnd(); startBtn.textContent = "START"; }
+            }, 200);
+            startBtn.textContent = "PAUSE";
+        }
+
+        function notifyNextTimer() {
+            if (!("Notification" in window) || Notification.permission !== "granted") return;
+            const nextLabel = mode === 'work' ? "集中タイマー" : "休憩タイマー";
+            const n = new Notification("タイマー終了", {
+                body: `通知を押すと次の${nextLabel}を開始します。`,
+                requireInteraction: true
+            });
+            n.onclick = () => {
+                window.focus();
+                if (!timerId) startCountdown();
+                n.close();
+            };
+        }
+
         startBtn.onclick = () => {
-    // 【追加】クリック時に音声をアンロック（鳴る準備をする）
-    document.getElementById('alarm-sound').play().then(() => {
-        const a = document.getElementById('alarm-sound');
-        a.pause(); a.currentTime = 0;
-    }).catch(e => {});
+            requestNotificationPermission();
+            // 【追加】クリック時に音声をアンロック（鳴る準備をする）
+            document.getElementById('alarm-sound').play().then(() => {
+                const a = document.getElementById('alarm-sound');
+                a.pause(); a.currentTime = 0;
+            }).catch(e => {});
             if (timerId) {
                 clearInterval(timerId); timerId = null;
                 startBtn.textContent = "START";
             } else {
-                endTime = Date.now() + (timeLeft * 1000);
-                statusLabel.textContent = mode.toUpperCase();
-                timerId = setInterval(() => {
-                    timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-                    updateUI();
-                    if(timeLeft <= 0) { clearInterval(timerId); timerId = null; handleEnd(); startBtn.textContent = "START"; }
-                }, 200);
-                startBtn.textContent = "PAUSE";
+                startCountdown();
             }
         };
 
@@ -237,11 +261,16 @@
 
         function handleEnd() {
             playAlarm();
+            let shouldNotify = true;
             if (mode === 'work') {
                 manualSync();
-                if (sessions >= 4) document.getElementById('long-break-modal').style.display = 'flex';
+                if (sessions >= 4) {
+                    document.getElementById('long-break-modal').style.display = 'flex';
+                    shouldNotify = false;
+                }
                 else initBreak(5);
             } else initWork();
+            if (shouldNotify) notifyNextTimer();
         }
 
         function initWork() { 
