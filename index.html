@@ -78,7 +78,7 @@
 
     <div id="main-content">
         <div id="user-config" style="display: flex; align-items: center; gap: 8px;">
-            <input type="text" id="user-name" placeholder="Name" value="Guest">
+            <input type="text" id="user-name" placeholder="name (カンマ区切りで複数可)" value="Guest">
             <button onclick="location.href='history.html'" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;">履歴</button>
         </div>
 
@@ -169,23 +169,52 @@
             fetchRanking();
         }
 
-        function manualSync() {
-            if(!GAS_URL || GAS_URL.includes("YOUR")) return;
-            syncStatus.textContent = "送信中...";
-            const form = document.createElement('form');
-            form.method = 'POST'; form.action = GAS_URL; form.target = 'hidden_iframe';
-            const input = document.createElement('input');
-            input.type = 'hidden'; input.name = 'name'; input.value = userNameInput.value || "Guest";
-            form.appendChild(input);
-            let iframe = document.getElementById('hidden_iframe') || document.body.appendChild(Object.assign(document.createElement('iframe'), {id:'hidden_iframe', name:'hidden_iframe', style:'display:none'}));
-            document.body.appendChild(form);
-            form.submit();
-            setTimeout(() => {
-                if (document.body.contains(form)) document.body.removeChild(form);
-                syncStatus.textContent = "シートへ記録完了！";
-                fetchRanking();
-            }, 2000);
-        }
+       function manualSync() {
+    if(!GAS_URL || GAS_URL.includes("YOUR")) return;
+    
+    // 入力値をカンマ「,」で分割してリスト化
+    const names = userNameInput.value.split(',').map(n => n.trim()).filter(n => n !== "");
+    if (names.length === 0) return;
+
+    syncStatus.textContent = `${names.length}人分を個別に送信中...`;
+
+    names.forEach((name, index) => {
+        // ★ポイント：一人ひとりに専用の「隠し窓口(iframe)」をその場で作る
+        const iframe = document.createElement('iframe');
+        const iframeName = "tmp_frame_" + index + "_" + Date.now(); // 重複しない名前
+        iframe.name = iframeName;
+        iframe.style.display = "none";
+        document.body.appendChild(iframe);
+
+        // その窓口（iframeName）に向けてフォームを送信
+        const form = document.createElement('form');
+        form.method = 'POST'; 
+        form.action = GAS_URL; 
+        form.target = iframeName; // この人専用の窓口を指定
+        
+        const input = document.createElement('input');
+        input.type = 'hidden'; 
+        input.name = 'name'; 
+        input.value = name;
+        
+        form.appendChild(input);
+        document.body.appendChild(form);
+        
+        form.submit();
+
+        // 送信が終わったら（5秒後くらいに）後片付けをして消す
+        setTimeout(() => {
+            if(document.body.contains(form)) document.body.removeChild(form);
+            if(document.body.contains(iframe)) document.body.removeChild(iframe);
+        }, 5000); 
+    });
+
+    // 全員の送信指示が終わったら表示を更新
+    setTimeout(() => {
+        syncStatus.textContent = "全員分の送信完了！";
+        fetchRanking(); // ランキングを再読み込み
+    }, 2000);
+}
 
         function fetchRanking() {
             if(!GAS_URL || GAS_URL.includes("YOUR")) return;
