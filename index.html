@@ -195,49 +195,53 @@
 
        function manualSync() {
     if(!GAS_URL || GAS_URL.includes("YOUR")) return;
-    
-    // 入力値をカンマ「,」で分割してリスト化
-    const names = userNameInput.value.split(',').map(n => n.trim()).filter(n => n !== "");
+
+    // 半角/全角カンマの両方に対応して分割
+    const names = userNameInput.value
+        .split(/[、,]/)
+        .map(n => n.trim())
+        .filter(n => n !== "");
     if (names.length === 0) return;
 
-    syncStatus.textContent = `${names.length}人分を個別に送信中...`;
+    syncStatus.textContent = `${names.length}人分を順番に送信中...`;
 
+    // 同時送信で欠損しないよう、1人ずつ順番に送信する
     names.forEach((name, index) => {
-        // ★ポイント：一人ひとりに専用の「隠し窓口(iframe)」をその場で作る
-        const iframe = document.createElement('iframe');
-        const iframeName = "tmp_frame_" + index + "_" + Date.now(); // 重複しない名前
-        iframe.name = iframeName;
-        iframe.style.display = "none";
-        document.body.appendChild(iframe);
-
-        // その窓口（iframeName）に向けてフォームを送信
-        const form = document.createElement('form');
-        form.method = 'POST'; 
-        form.action = GAS_URL; 
-        form.target = iframeName; // この人専用の窓口を指定
-        
-        const input = document.createElement('input');
-        input.type = 'hidden'; 
-        input.name = 'name'; 
-        input.value = name;
-        
-        form.appendChild(input);
-        document.body.appendChild(form);
-        
-        form.submit();
-
-        // 送信が終わったら（5秒後くらいに）後片付けをして消す
         setTimeout(() => {
-            if(document.body.contains(form)) document.body.removeChild(form);
-            if(document.body.contains(iframe)) document.body.removeChild(iframe);
-        }, 5000); 
+            const iframe = document.createElement('iframe');
+            const iframeName = `tmp_frame_${Date.now()}_${index}`;
+            iframe.name = iframeName;
+            iframe.style.display = "none";
+            document.body.appendChild(iframe);
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = GAS_URL;
+            form.target = iframeName;
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'name';
+            input.value = name;
+
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+
+            syncStatus.textContent = `${index + 1}/${names.length}人分を送信済み...`;
+
+            setTimeout(() => {
+                if(document.body.contains(form)) document.body.removeChild(form);
+                if(document.body.contains(iframe)) document.body.removeChild(iframe);
+            }, 5000);
+        }, index * 700);
     });
 
-    // 全員の送信指示が終わったら表示を更新
+    const doneWait = (names.length * 700) + 1500;
     setTimeout(() => {
         syncStatus.textContent = "全員分の送信完了！";
-        fetchRanking(); // ランキングを再読み込み
-    }, 2000);
+        fetchRanking();
+    }, doneWait);
 }
 
         function fetchRanking() {
