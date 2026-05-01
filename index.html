@@ -14,6 +14,12 @@
             font-family: -apple-system, sans-serif; transition: background-color 0.8s; overflow: hidden;
             touch-action: manipulation;
         }
+        body.custom-bg {
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
 
         /* サイドパネル */
         #side-panel {
@@ -77,8 +83,19 @@
     </div>
 
     <div id="main-content">
-        <div id="user-config" style="display: flex; align-items: center; gap: 8px;">
+        <div id="user-config" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 92%;">
             <input type="text" id="user-name" placeholder="name (カンマ区切りで複数可)" value="Guest">
+            <select id="color-theme" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 12px; border-radius: 8px; outline: none;">
+                <option value="default">Default Blue</option>
+                <option value="sunset">Sunset</option>
+                <option value="forest">Forest</option>
+                <option value="lavender">Lavender</option>
+                <option value="monochrome">Monochrome</option>
+                <option value="ocean">Ocean</option>
+            </select>
+            <label for="bg-upload" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;">背景画像</label>
+            <input type="file" id="bg-upload" accept="image/*" style="display:none;">
+            <button id="clear-bg-btn" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;">背景解除</button>
             <button onclick="location.href='history.html'" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;">履歴</button>
         </div>
 
@@ -114,10 +131,64 @@
 
         let duration = 25 * 60, timeLeft = 25 * 60, endTime = null, timerId = null, sessions = 1, mode = 'work', currentFilter = 'today';
         const timerDisplay = document.getElementById('timer'), startBtn = document.getElementById('start-btn'), seekBar = document.getElementById('seek-bar');
-        const dots = document.querySelectorAll('.dot'), userNameInput = document.getElementById('user-name'), syncStatus = document.getElementById('sync-status'), statusLabel = document.getElementById('status-label');
+        const dots = document.querySelectorAll('.dot'), userNameInput = document.getElementById('user-name'), syncStatus = document.getElementById('sync-status'), statusLabel = document.getElementById('status-label'), colorThemeSelect = document.getElementById('color-theme'), bgUpload = document.getElementById('bg-upload'), clearBgBtn = document.getElementById('clear-bg-btn');
+
+        const themePalette = {
+            default: {work:'#0f172a', break:'#064e3b', long:'#1e3a8a', accent:'#38bdf8'},
+            sunset: {work:'#4a1d2f', break:'#6b3f25', long:'#392f5a', accent:'#f59e0b'},
+            forest: {work:'#0b2f1f', break:'#14532d', long:'#1f4f46', accent:'#84cc16'},
+            lavender: {work:'#2e1a47', break:'#4c1d95', long:'#312e81', accent:'#c4b5fd'},
+            monochrome: {work:'#111827', break:'#1f2937', long:'#374151', accent:'#d1d5db'},
+            ocean: {work:'#082f49', break:'#0f766e', long:'#1d4ed8', accent:'#22d3ee'}
+        };
+
 
         if(localStorage.getItem('pomo_name')) userNameInput.value = localStorage.getItem('pomo_name');
         userNameInput.onchange = () => localStorage.setItem('pomo_name', userNameInput.value);
+        colorThemeSelect.value = localStorage.getItem('pomo_theme') || 'default';
+        applyTheme(colorThemeSelect.value);
+        colorThemeSelect.onchange = () => applyTheme(colorThemeSelect.value);
+
+        const savedBg = localStorage.getItem('pomo_bg_image');
+        if (savedBg) applyCustomBackground(savedBg);
+        bgUpload.onchange = (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => applyCustomBackground(ev.target.result);
+            reader.readAsDataURL(file);
+        };
+        clearBgBtn.onclick = () => {
+            bgUpload.value = '';
+            applyCustomBackground(null);
+        };
+
+
+        function applyTheme(themeKey) {
+            const theme = themePalette[themeKey] || themePalette.default;
+            document.documentElement.style.setProperty('--bg-work', theme.work);
+            document.documentElement.style.setProperty('--bg-break', theme.break);
+            document.documentElement.style.setProperty('--bg-long', theme.long);
+            document.documentElement.style.setProperty('--accent', theme.accent);
+            localStorage.setItem('pomo_theme', themeKey);
+            if (mode === 'work') document.body.style.backgroundColor = 'var(--bg-work)';
+            else document.body.style.backgroundColor = duration >= (15*60) ? 'var(--bg-long)' : 'var(--bg-break)';
+            updateUI();
+        }
+
+        function applyCustomBackground(dataUrl) {
+            if (dataUrl) {
+                document.body.classList.add('custom-bg');
+                document.body.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${dataUrl})`;
+                localStorage.setItem('pomo_bg_image', dataUrl);
+            } else {
+                document.body.classList.remove('custom-bg');
+                document.body.style.backgroundImage = 'none';
+                localStorage.removeItem('pomo_bg_image');
+                if (mode === 'work') document.body.style.backgroundColor = 'var(--bg-work)';
+                else document.body.style.backgroundColor = duration >= (15*60) ? 'var(--bg-long)' : 'var(--bg-break)';
+            }
+        }
 
         function updateUI() {
             const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
@@ -280,13 +351,13 @@
         function initWork() { 
             mode='work'; duration=25*60; timeLeft=duration; 
             if(statusLabel.textContent !== 'READY') sessions = (sessions >= 4) ? 1 : sessions + 1;
-            document.body.style.backgroundColor='var(--bg-work)'; 
+            if (!document.body.classList.contains('custom-bg')) document.body.style.backgroundColor='var(--bg-work)'; 
             statusLabel.textContent = "FOCUS"; updateUI(); 
         }
 
         function initBreak(m) { 
             mode='break'; duration=m*60; timeLeft=duration; 
-            document.body.style.backgroundColor=(m>=15)?'var(--bg-long)':'var(--bg-break)'; 
+            if (!document.body.classList.contains('custom-bg')) document.body.style.backgroundColor=(m>=15)?'var(--bg-long)':'var(--bg-break)'; 
             statusLabel.textContent = "BREAK"; updateUI(); 
         }
 
