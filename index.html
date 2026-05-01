@@ -141,24 +141,48 @@
             updateUI();
         };
 
+        function requestNotificationPermission() {
+            if (!("Notification" in window) || Notification.permission !== "default") return;
+            Notification.requestPermission().catch(() => {});
+        }
+
+        function startCountdown() {
+            endTime = Date.now() + (timeLeft * 1000);
+            statusLabel.textContent = mode.toUpperCase();
+            timerId = setInterval(() => {
+                timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+                updateUI();
+                if(timeLeft <= 0) { clearInterval(timerId); timerId = null; handleEnd(); startBtn.textContent = "START"; }
+            }, 200);
+            startBtn.textContent = "PAUSE";
+        }
+
+        function notifyNextTimer() {
+            if (!("Notification" in window) || Notification.permission !== "granted") return;
+            const nextLabel = mode === 'work' ? "集中タイマー" : "休憩タイマー";
+            const n = new Notification("タイマー終了", {
+                body: `通知を押すと次の${nextLabel}を開始します。`,
+                requireInteraction: true
+            });
+            n.onclick = () => {
+                window.focus();
+                if (!timerId) startCountdown();
+                n.close();
+            };
+        }
+
         startBtn.onclick = () => {
-    // 【追加】クリック時に音声をアンロック（鳴る準備をする）
-    document.getElementById('alarm-sound').play().then(() => {
-        const a = document.getElementById('alarm-sound');
-        a.pause(); a.currentTime = 0;
-    }).catch(e => {});
+            requestNotificationPermission();
+            // 【追加】クリック時に音声をアンロック（鳴る準備をする）
+            document.getElementById('alarm-sound').play().then(() => {
+                const a = document.getElementById('alarm-sound');
+                a.pause(); a.currentTime = 0;
+            }).catch(e => {});
             if (timerId) {
                 clearInterval(timerId); timerId = null;
                 startBtn.textContent = "START";
             } else {
-                endTime = Date.now() + (timeLeft * 1000);
-                statusLabel.textContent = mode.toUpperCase();
-                timerId = setInterval(() => {
-                    timeLeft = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-                    updateUI();
-                    if(timeLeft <= 0) { clearInterval(timerId); timerId = null; handleEnd(); startBtn.textContent = "START"; }
-                }, 200);
-                startBtn.textContent = "PAUSE";
+                startCountdown();
             }
         };
 
@@ -171,49 +195,53 @@
 
        function manualSync() {
     if(!GAS_URL || GAS_URL.includes("YOUR")) return;
-    
-    // 入力値をカンマ「,」で分割してリスト化
-    const names = userNameInput.value.split(',').map(n => n.trim()).filter(n => n !== "");
+
+    // 半角/全角カンマの両方に対応して分割
+    const names = userNameInput.value
+        .split(/[、,]/)
+        .map(n => n.trim())
+        .filter(n => n !== "");
     if (names.length === 0) return;
 
-    syncStatus.textContent = `${names.length}人分を個別に送信中...`;
+    syncStatus.textContent = `${names.length}人分を順番に送信中...`;
 
+    // 同時送信で欠損しないよう、1人ずつ順番に送信する
     names.forEach((name, index) => {
-        // ★ポイント：一人ひとりに専用の「隠し窓口(iframe)」をその場で作る
-        const iframe = document.createElement('iframe');
-        const iframeName = "tmp_frame_" + index + "_" + Date.now(); // 重複しない名前
-        iframe.name = iframeName;
-        iframe.style.display = "none";
-        document.body.appendChild(iframe);
-
-        // その窓口（iframeName）に向けてフォームを送信
-        const form = document.createElement('form');
-        form.method = 'POST'; 
-        form.action = GAS_URL; 
-        form.target = iframeName; // この人専用の窓口を指定
-        
-        const input = document.createElement('input');
-        input.type = 'hidden'; 
-        input.name = 'name'; 
-        input.value = name;
-        
-        form.appendChild(input);
-        document.body.appendChild(form);
-        
-        form.submit();
-
-        // 送信が終わったら（5秒後くらいに）後片付けをして消す
         setTimeout(() => {
-            if(document.body.contains(form)) document.body.removeChild(form);
-            if(document.body.contains(iframe)) document.body.removeChild(iframe);
-        }, 5000); 
+            const iframe = document.createElement('iframe');
+            const iframeName = `tmp_frame_${Date.now()}_${index}`;
+            iframe.name = iframeName;
+            iframe.style.display = "none";
+            document.body.appendChild(iframe);
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = GAS_URL;
+            form.target = iframeName;
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'name';
+            input.value = name;
+
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+
+            syncStatus.textContent = `${index + 1}/${names.length}人分を送信済み...`;
+
+            setTimeout(() => {
+                if(document.body.contains(form)) document.body.removeChild(form);
+                if(document.body.contains(iframe)) document.body.removeChild(iframe);
+            }, 5000);
+        }, index * 700);
     });
 
-    // 全員の送信指示が終わったら表示を更新
+    const doneWait = (names.length * 700) + 1500;
     setTimeout(() => {
         syncStatus.textContent = "全員分の送信完了！";
-        fetchRanking(); // ランキングを再読み込み
-    }, 2000);
+        fetchRanking();
+    }, doneWait);
 }
 
         function fetchRanking() {
@@ -237,11 +265,16 @@
 
         function handleEnd() {
             playAlarm();
+            let shouldNotify = true;
             if (mode === 'work') {
                 manualSync();
-                if (sessions >= 4) document.getElementById('long-break-modal').style.display = 'flex';
+                if (sessions >= 4) {
+                    document.getElementById('long-break-modal').style.display = 'flex';
+                    shouldNotify = false;
+                }
                 else initBreak(5);
             } else initWork();
+            if (shouldNotify) notifyNextTimer();
         }
 
         function initWork() { 
